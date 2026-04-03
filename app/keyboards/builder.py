@@ -5,6 +5,7 @@ def get_main_menu_kb(is_admin: bool) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.button(text="🏢 Каталог ЖК")
     builder.button(text="🔍 Поиск по названию")
+    builder.button(text="📝 Запрос на обзор")
     if is_admin:
         builder.button(text="➕ Добавить ЖК")
         builder.button(text="⚙️ Управление ЖК")
