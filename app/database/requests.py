@@ -16,7 +16,7 @@ async def get_complexes_by_filter(district: str, estate_class: str):
 async def search_complexes_by_name(query: str):
     async with async_session() as session:
         result = await session.execute(
-            select(ResidentialComplex).where(ResidentialComplex.name.icontains(query))
+            select(ResidentialComplex).where(ResidentialComplex.name.icontains(query)).limit(20)
         )
         return result.scalars().all()
 

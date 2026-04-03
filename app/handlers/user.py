@@ -1,18 +1,17 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 from aiogram.fsm.context import FSMContext
+from aiogram.filters import StateFilter
+from aiogram.fsm.state import any_state
 from sqlalchemy import select
+
 from app.keyboards.builder import get_classes_kb, get_complexes_kb, get_districts_kb, get_floor_plans_kb
 from app.database.requests import get_complexes_by_filter, get_complex_by_id, search_complexes_by_name, get_floor_plans
 from app.database.engine import async_session
 from app.database.models import Photo
 from app.utils.formatters import format_complex_info
-from app.states.states import UserSearch
-from aiogram.filters import StateFilter
-from aiogram.fsm.state import any_state
-from aiogram import Bot
-from app.config import settings
 from app.states.states import UserSearch, RequestReview
+from app.config import settings
 
 router = Router()
 
@@ -51,6 +50,7 @@ async def review_request_final(message: Message, state: FSMContext, bot: Bot):
             continue
 
     await message.answer("Ваш запрос отправлен специалистам. Спасибо!")
+
 
 @router.message(F.text == "🏢 Каталог ЖК", StateFilter(any_state))
 async def user_catalog(message: Message, state: FSMContext):
@@ -110,16 +110,28 @@ async def process_complex(callback: CallbackQuery):
     kb = get_floor_plans_kb(complex_id) if plans else None
 
     if photos:
-        media_group = [InputMediaPhoto(media=p.telegram_file_id) for p in photos[:10]]
-        if len(text) <= 1024:
-            media_group[0].caption = text
-            media_group[0].parse_mode = "HTML"
-            await callback.message.answer_media_group(media_group)
-            if kb:
-                await callback.message.answer("Дополнительная информация:", reply_markup=kb)
+        if len(photos) == 1:
+            if len(text) <= 1024:
+                await callback.message.answer_photo(
+                    photo=photos[0].telegram_file_id,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb
+                )
+            else:
+                await callback.message.answer_photo(photo=photos[0].telegram_file_id)
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
         else:
-            await callback.message.answer_media_group(media_group)
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
+            media_group = [InputMediaPhoto(media=p.telegram_file_id) for p in photos[:10]]
+            if len(text) <= 1024:
+                media_group[0].caption = text
+                media_group[0].parse_mode = "HTML"
+                await callback.message.answer_media_group(media_group)
+                if kb:
+                    await callback.message.answer("Дополнительная информация:", reply_markup=kb)
+            else:
+                await callback.message.answer_media_group(media_group)
+                await callback.message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
     else:
         await callback.message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
 
@@ -132,6 +144,10 @@ async def process_plans(callback: CallbackQuery):
         await callback.answer("Планировки отсутствуют", show_alert=True)
         return
 
-    media_group = [InputMediaPhoto(media=p.telegram_file_id) for p in plans[:10]]
-    await callback.message.answer_media_group(media_group)
+    if len(plans) == 1:
+        await callback.message.answer_photo(plans[0].telegram_file_id)
+    else:
+        media_group = [InputMediaPhoto(media=p.telegram_file_id) for p in plans[:10]]
+        await callback.message.answer_media_group(media_group)
+
     await callback.answer()
