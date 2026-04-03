@@ -11,6 +11,17 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(50), default='user')
     username: Mapped[str] = mapped_column(String(255), nullable=True)
 
+class ComplexUpdateHistory(Base):
+    __tablename__ = 'complex_update_history'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    complex_id: Mapped[int] = mapped_column(Integer, ForeignKey('residential_complexes.id'))
+    field_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    old_value: Mapped[str] = mapped_column(Text, nullable=True)
+    new_value: Mapped[str] = mapped_column(Text, nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+    complex = relationship("ResidentialComplex", back_populates="history_updates")
+
 class ResidentialComplex(Base):
     __tablename__ = 'residential_complexes'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -28,6 +39,7 @@ class ResidentialComplex(Base):
 
     photos = relationship("Photo", back_populates="complex", cascade="all, delete-orphan")
     floor_plans = relationship("FloorPlan", back_populates="complex", cascade="all, delete-orphan")
+    history_updates = relationship("ComplexUpdateHistory", back_populates="complex", cascade="all, delete-orphan")
 
 class Photo(Base):
     __tablename__ = 'photos'

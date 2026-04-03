@@ -1,7 +1,8 @@
 from sqlalchemy import select, update, delete
 from app.database.engine import async_session
-from app.database.models import ResidentialComplex, Photo, FloorPlan, User
+from app.database.models import ResidentialComplex, Photo, FloorPlan, User, ComplexUpdateHistory
 from typing import Any
+
 
 async def get_complexes_by_filter(district: str, estate_class: str):
     async with async_session() as session:
@@ -13,6 +14,7 @@ async def get_complexes_by_filter(district: str, estate_class: str):
         )
         return result.scalars().all()
 
+
 async def search_complexes_by_name(query: str):
     async with async_session() as session:
         result = await session.execute(
@@ -20,12 +22,14 @@ async def search_complexes_by_name(query: str):
         )
         return result.scalars().all()
 
+
 async def get_complex_by_id(complex_id: int):
     async with async_session() as session:
         result = await session.execute(
             select(ResidentialComplex).where(ResidentialComplex.id == complex_id)
         )
         return result.scalar_one_or_none()
+
 
 async def add_complex(data: dict) -> int:
     async with async_session() as session:
@@ -35,11 +39,13 @@ async def add_complex(data: dict) -> int:
         await session.refresh(new_complex)
         return new_complex.id
 
+
 async def add_photo(complex_id: int, file_id: str):
     async with async_session() as session:
         new_photo = Photo(complex_id=complex_id, telegram_file_id=file_id)
         session.add(new_photo)
         await session.commit()
+
 
 async def add_floor_plan(complex_id: int, file_id: str):
     async with async_session() as session:
@@ -47,11 +53,30 @@ async def add_floor_plan(complex_id: int, file_id: str):
         session.add(new_plan)
         await session.commit()
 
+
 async def update_complex_field(complex_id: int, field_name: str, new_value: Any):
     async with async_session() as session:
+        result = await session.execute(select(ResidentialComplex).where(ResidentialComplex.id == complex_id))
+        complex_obj = result.scalar_one_or_none()
+
+        if not complex_obj:
+            return
+
+        old_value = str(getattr(complex_obj, field_name, ""))
+
         stmt = update(ResidentialComplex).where(ResidentialComplex.id == complex_id).values({field_name: new_value})
         await session.execute(stmt)
+
+        history_record = ComplexUpdateHistory(
+            complex_id=complex_id,
+            field_name=field_name,
+            old_value=old_value,
+            new_value=str(new_value)
+        )
+        session.add(history_record)
+
         await session.commit()
+
 
 async def register_user(tg_id: int, username: str = None):
     async with async_session() as session:
@@ -60,16 +85,19 @@ async def register_user(tg_id: int, username: str = None):
             session.add(User(telegram_id=tg_id, username=username))
             await session.commit()
 
+
 async def get_all_user_ids():
     async with async_session() as session:
         result = await session.execute(select(User.telegram_id))
         return result.scalars().all()
+
 
 async def delete_complex(complex_id: int):
     async with async_session() as session:
         stmt = delete(ResidentialComplex).where(ResidentialComplex.id == complex_id)
         await session.execute(stmt)
         await session.commit()
+
 
 async def get_floor_plans(complex_id: int):
     async with async_session() as session:
