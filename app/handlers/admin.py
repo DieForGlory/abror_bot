@@ -5,7 +5,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 from app.states.states import AddComplex, EditComplex
 from app.database.requests import (
-    add_complex, add_photo, add_floor_plan, get_complexes_by_filter, update_complex_field, delete_complex
+    add_complex, add_photo, add_floor_plan, get_complexes_by_filter,
+    update_complex_field, delete_complex, get_complex_by_id
 )
 from app.utils.broadcaster import broadcast_new_complex
 from app.middlewares.role_check import AdminMiddleware
@@ -134,6 +135,9 @@ async def process_done(message: Message, state: FSMContext):
     for file_id in plan_ids:
         await add_floor_plan(complex_id, file_id)
 
+    # Вызов рассылки
+    await broadcast_new_complex(message.bot, complex_id, data['name'], is_update=False)
+
     await state.clear()
     await message.answer(f"Запись сохранена.", reply_markup=get_main_menu_kb(True))
 
@@ -204,6 +208,12 @@ async def edit_stage_field(callback: CallbackQuery, state: FSMContext):
 @router.message(EditComplex.input_value)
 async def edit_stage_final(message: Message, state: FSMContext):
     data = await state.get_data()
-    await update_complex_field(data['complex_id'], data['field_to_update'], message.text)
+    complex_id = data['complex_id']
+    await update_complex_field(complex_id, data['field_to_update'], message.text)
+
+    # Получение названия для рассылки и запуск
+    c = await get_complex_by_id(complex_id)
+    await broadcast_new_complex(message.bot, complex_id, c.name, is_update=True)
+
     await state.clear()
     await message.answer("Данные обновлены.", reply_markup=get_main_menu_kb(True))

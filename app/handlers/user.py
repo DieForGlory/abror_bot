@@ -10,6 +10,9 @@ from app.utils.formatters import format_complex_info
 from app.states.states import UserSearch
 from aiogram.filters import StateFilter
 from aiogram.fsm.state import any_state
+from aiogram import Bot
+from app.config import settings
+from app.states.states import UserSearch, RequestReview
 
 router = Router()
 
@@ -33,10 +36,10 @@ async def review_request_final(message: Message, state: FSMContext, bot: Bot):
     data = await state.get_data()
     await state.clear()
 
-    # Уведомление админов
+    username_str = f" (@{message.from_user.username})" if message.from_user.username else ""
     admin_text = (
         f"📩 <b>Новый запрос на обзор!</b>\n\n"
-        f"От: {message.from_user.full_name} (@{message.from_user.username})\n"
+        f"От: {message.from_user.full_name}{username_str}\n"
         f"ЖК: {data['name']}\n"
         f"Комментарий: {message.text}"
     )
