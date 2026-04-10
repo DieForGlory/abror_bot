@@ -23,6 +23,12 @@ router = Router()
 router.message.middleware(AdminMiddleware())
 router.callback_query.middleware(AdminMiddleware())
 
+def format_price(value):
+    if value is None:
+        return "Нет данных"
+    # Преобразуем во float для обработки возможного Decimal/Float из AVG(),
+    # Форматируем с запятыми, затем заменяем запятые на точки
+    return f"{float(value):,.0f}".replace(",", ".")
 
 @router.message(F.text == "➕ Добавить ЖК", StateFilter(any_state))
 async def admin_add_start(message: Message, state: FSMContext):
@@ -252,18 +258,18 @@ async def admin_analytics(message: Message, state: FSMContext):
     if not districts:
         text += "Нет данных\n"
     for dist, avg_price in districts:
-        text += f"— {dist}: {avg_price}\n"
+        text += f"— {dist}: {format_price(avg_price)}\n"
 
     text += "\n💎 <b>Средняя цена по классам:</b>\n"
     if not classes:
         text += "Нет данных\n"
     for cls, avg_price in classes:
-        text += f"— {cls}: {avg_price}\n"
+        text += f"— {cls}: {format_price(avg_price)}\n"
 
     text += "\n🏗 <b>Средняя цена по застройщикам (Район | Класс):</b>\n"
     if not developers:
         text += "Нет данных\n"
     for dev, dist, cls, avg_price in developers:
-        text += f"— <b>{dev}</b> ({dist}, {cls}): {avg_price}\n"
+        text += f"— <b>{dev}</b> ({dist}, {cls}): {format_price(avg_price)}\n"
 
     await message.answer(text, parse_mode="HTML")
