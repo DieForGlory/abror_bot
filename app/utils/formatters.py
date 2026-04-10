@@ -4,9 +4,11 @@ from app.database.models import ResidentialComplex
 def format_complex_info(c: ResidentialComplex) -> str:
     updated = c.updated_at.strftime("%d.%m.%Y %H:%M") if c.updated_at else "Нет данных"
     link_text = f"<a href='{c.location_link}'>Открыть на карте</a>" if c.location_link and c.location_link != "-" else "Не указана"
+    developer_text = c.developer if c.developer else "Не указан"
 
     return (
         f"🏢 <b>{c.name}</b>\n\n"
+        f"🏗 <b>Застройщик:</b> {developer_text}\n"
         f"📍 <b>Район:</b> {c.district}\n"
         f"💎 <b>Класс:</b> {c.estate_class}\n"
         f"🏗 <b>Этажность:</b> {c.floors}\n"

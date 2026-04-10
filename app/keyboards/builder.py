@@ -84,8 +84,7 @@ def get_fields_to_edit_kb() -> InlineKeyboardMarkup:
     fields = {
         "name": "Название",
         "developer": "Застройщик",
-        "price": "Цена (Текст)",
-        "price_numeric": "Цена (Число)",
+        "price": "Цена",
         "current_stage": "Этап",
         "deadline": "Срок сдачи",
         "finish_type": "Отделка",

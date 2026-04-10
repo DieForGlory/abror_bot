@@ -61,7 +61,7 @@ async def process_class(message: Message, state: FSMContext):
 async def process_finish(message: Message, state: FSMContext):
     await state.update_data(finish_type=message.text)
     await state.set_state(AddComplex.price)
-    await message.answer("Введите цену со скидками:", reply_markup=ReplyKeyboardRemove())
+    await message.answer("Введите цену (только цифры):", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(AddComplex.price)
@@ -70,12 +70,12 @@ async def process_price(message: Message, state: FSMContext):
     await state.set_state(AddComplex.price_numeric)
     await message.answer("Введите числовую цену (для аналитики, только цифры):")
 
-@router.message(AddComplex.price_numeric)
-async def process_price_numeric(message: Message, state: FSMContext):
+@router.message(AddComplex.price)
+async def process_price(message: Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("Ошибка. Введите только цифры:")
+        await message.answer("Требуется число. Введите цену (только цифры):")
         return
-    await state.update_data(price_numeric=int(message.text))
+    await state.update_data(price=int(message.text))
     await state.set_state(AddComplex.floors)
     await message.answer("Введите этажность (число или диапазон, например 14-16):")
 
@@ -87,7 +87,7 @@ async def edit_stage_final(message: Message, state: FSMContext):
     field_to_update = data['field_to_update']
 
     new_value = message.text
-    if field_to_update == "price_numeric":
+    if field_to_update == "price":
         if not new_value.isdigit():
             await message.answer("Требуется число. Введите заново:")
             return
@@ -240,19 +240,6 @@ async def edit_stage_field(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.answer("Введите новое значение для этого поля:", reply_markup=ReplyKeyboardRemove())
 
-
-@router.message(EditComplex.input_value)
-async def edit_stage_final(message: Message, state: FSMContext):
-    data = await state.get_data()
-    complex_id = data['complex_id']
-    await update_complex_field(complex_id, data['field_to_update'], message.text)
-
-    # Получение названия для рассылки и запуск
-    c = await get_complex_by_id(complex_id)
-    await broadcast_new_complex(message.bot, complex_id, c.name, is_update=True)
-
-    await state.clear()
-    await message.answer("Данные обновлены.", reply_markup=get_main_menu_kb(True))
 
 @router.message(F.text == "📊 Аналитика рынка", StateFilter(any_state))
 async def admin_analytics(message: Message, state: FSMContext):

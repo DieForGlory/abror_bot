@@ -106,38 +106,35 @@ async def get_floor_plans(complex_id: int):
 
 async def get_analytics_data():
     async with async_session() as session:
-        # Средняя цена по районам
         district_query = await session.execute(
             select(
                 ResidentialComplex.district,
-                func.round(func.avg(ResidentialComplex.price_numeric), 2)
+                func.round(func.avg(ResidentialComplex.price), 2)
             )
-            .where(ResidentialComplex.price_numeric.isnot(None))
+            .where(ResidentialComplex.price.isnot(None))
             .group_by(ResidentialComplex.district)
         )
         districts = district_query.all()
 
-        # Средняя цена по классам жилья
         class_query = await session.execute(
             select(
                 ResidentialComplex.estate_class,
-                func.round(func.avg(ResidentialComplex.price_numeric), 2)
+                func.round(func.avg(ResidentialComplex.price), 2)
             )
-            .where(ResidentialComplex.price_numeric.isnot(None))
+            .where(ResidentialComplex.price.isnot(None))
             .group_by(ResidentialComplex.estate_class)
         )
         classes = class_query.all()
 
-        # Средняя цена застройщика по районам и классам
         dev_query = await session.execute(
             select(
                 ResidentialComplex.developer,
                 ResidentialComplex.district,
                 ResidentialComplex.estate_class,
-                func.round(func.avg(ResidentialComplex.price_numeric), 2)
+                func.round(func.avg(ResidentialComplex.price), 2)
             )
             .where(ResidentialComplex.developer.isnot(None))
-            .where(ResidentialComplex.price_numeric.isnot(None))
+            .where(ResidentialComplex.price.isnot(None))
             .group_by(
                 ResidentialComplex.developer,
                 ResidentialComplex.district,
