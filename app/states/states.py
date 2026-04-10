@@ -2,10 +2,12 @@ from aiogram.fsm.state import State, StatesGroup
 
 class AddComplex(StatesGroup):
     name = State()
+    developer = State()
     district = State()
     estate_class = State()
     finish_type = State()
     price = State()
+    price_numeric = State()
     floors = State()
     amenities = State()
     deadline = State()

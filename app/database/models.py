@@ -30,6 +30,8 @@ class ResidentialComplex(Base):
     estate_class: Mapped[str] = mapped_column(String(100), nullable=False)
     finish_type: Mapped[str] = mapped_column(String(100))
     price: Mapped[str] = mapped_column(String(255))
+    developer: Mapped[str] = mapped_column(String(255), nullable=True)
+    price_numeric: Mapped[int] = mapped_column(Integer, nullable=True)
     floors: Mapped[str] = mapped_column(String(100))
     amenities: Mapped[str] = mapped_column(Text)
     deadline: Mapped[str] = mapped_column(String(100))

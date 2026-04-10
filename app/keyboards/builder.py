@@ -9,6 +9,7 @@ def get_main_menu_kb(is_admin: bool) -> ReplyKeyboardMarkup:
     if is_admin:
         builder.button(text="➕ Добавить ЖК")
         builder.button(text="⚙️ Управление ЖК")
+        builder.button(text="📊 Аналитика рынка") # Новая кнопка
     builder.adjust(2)
     return builder.as_markup(resize_keyboard=True)
 
@@ -82,7 +83,9 @@ def get_fields_to_edit_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     fields = {
         "name": "Название",
-        "price": "Цена",
+        "developer": "Застройщик",
+        "price": "Цена (Текст)",
+        "price_numeric": "Цена (Число)",
         "current_stage": "Этап",
         "deadline": "Срок сдачи",
         "finish_type": "Отделка",

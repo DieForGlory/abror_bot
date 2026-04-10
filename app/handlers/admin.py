@@ -17,6 +17,7 @@ from app.keyboards.builder import (
 )
 from aiogram.fsm.state import any_state
 from app.config import settings
+from app.database.requests import get_analytics_data
 
 router = Router()
 router.message.middleware(AdminMiddleware())
@@ -33,9 +34,14 @@ async def admin_add_start(message: Message, state: FSMContext):
 @router.message(AddComplex.name)
 async def process_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
+    await state.set_state(AddComplex.developer)
+    await message.answer("Введите застройщика:", reply_markup=ReplyKeyboardRemove())
+
+@router.message(AddComplex.developer)
+async def process_developer(message: Message, state: FSMContext):
+    await state.update_data(developer=message.text)
     await state.set_state(AddComplex.district)
     await message.answer("Выберите район:", reply_markup=get_admin_districts_kb())
-
 
 @router.message(AddComplex.district)
 async def process_district(message: Message, state: FSMContext):
@@ -61,9 +67,39 @@ async def process_finish(message: Message, state: FSMContext):
 @router.message(AddComplex.price)
 async def process_price(message: Message, state: FSMContext):
     await state.update_data(price=message.text)
+    await state.set_state(AddComplex.price_numeric)
+    await message.answer("Введите числовую цену (для аналитики, только цифры):")
+
+@router.message(AddComplex.price_numeric)
+async def process_price_numeric(message: Message, state: FSMContext):
+    if not message.text.isdigit():
+        await message.answer("Ошибка. Введите только цифры:")
+        return
+    await state.update_data(price_numeric=int(message.text))
     await state.set_state(AddComplex.floors)
     await message.answer("Введите этажность (число или диапазон, например 14-16):")
 
+
+@router.message(EditComplex.input_value)
+async def edit_stage_final(message: Message, state: FSMContext):
+    data = await state.get_data()
+    complex_id = data['complex_id']
+    field_to_update = data['field_to_update']
+
+    new_value = message.text
+    if field_to_update == "price_numeric":
+        if not new_value.isdigit():
+            await message.answer("Требуется число. Введите заново:")
+            return
+        new_value = int(new_value)
+
+    await update_complex_field(complex_id, field_to_update, new_value)
+
+    c = await get_complex_by_id(complex_id)
+    await broadcast_new_complex(message.bot, complex_id, c.name, is_update=True)
+
+    await state.clear()
+    await message.answer("Данные обновлены.", reply_markup=get_main_menu_kb(True))
 
 @router.message(AddComplex.floors)
 async def process_floors(message: Message, state: FSMContext):
@@ -217,3 +253,30 @@ async def edit_stage_final(message: Message, state: FSMContext):
 
     await state.clear()
     await message.answer("Данные обновлены.", reply_markup=get_main_menu_kb(True))
+
+@router.message(F.text == "📊 Аналитика рынка", StateFilter(any_state))
+async def admin_analytics(message: Message, state: FSMContext):
+    await state.clear()
+    districts, classes, developers = await get_analytics_data()
+
+    text = "📊 <b>Аналитика рынка недвижимости</b>\n\n"
+
+    text += "📍 <b>Средняя цена по районам:</b>\n"
+    if not districts:
+        text += "Нет данных\n"
+    for dist, avg_price in districts:
+        text += f"— {dist}: {avg_price}\n"
+
+    text += "\n💎 <b>Средняя цена по классам:</b>\n"
+    if not classes:
+        text += "Нет данных\n"
+    for cls, avg_price in classes:
+        text += f"— {cls}: {avg_price}\n"
+
+    text += "\n🏗 <b>Средняя цена по застройщикам (Район | Класс):</b>\n"
+    if not developers:
+        text += "Нет данных\n"
+    for dev, dist, cls, avg_price in developers:
+        text += f"— <b>{dev}</b> ({dist}, {cls}): {avg_price}\n"
+
+    await message.answer(text, parse_mode="HTML")

@@ -2,7 +2,7 @@ from sqlalchemy import select, update, delete
 from app.database.engine import async_session
 from app.database.models import ResidentialComplex, Photo, FloorPlan, User, ComplexUpdateHistory
 from typing import Any
-
+from sqlalchemy import func
 
 async def get_complexes_by_filter(district: str, estate_class: str):
     async with async_session() as session:
@@ -103,3 +103,47 @@ async def get_floor_plans(complex_id: int):
     async with async_session() as session:
         result = await session.execute(select(FloorPlan).where(FloorPlan.complex_id == complex_id))
         return result.scalars().all()
+
+async def get_analytics_data():
+    async with async_session() as session:
+        # Средняя цена по районам
+        district_query = await session.execute(
+            select(
+                ResidentialComplex.district,
+                func.round(func.avg(ResidentialComplex.price_numeric), 2)
+            )
+            .where(ResidentialComplex.price_numeric.isnot(None))
+            .group_by(ResidentialComplex.district)
+        )
+        districts = district_query.all()
+
+        # Средняя цена по классам жилья
+        class_query = await session.execute(
+            select(
+                ResidentialComplex.estate_class,
+                func.round(func.avg(ResidentialComplex.price_numeric), 2)
+            )
+            .where(ResidentialComplex.price_numeric.isnot(None))
+            .group_by(ResidentialComplex.estate_class)
+        )
+        classes = class_query.all()
+
+        # Средняя цена застройщика по районам и классам
+        dev_query = await session.execute(
+            select(
+                ResidentialComplex.developer,
+                ResidentialComplex.district,
+                ResidentialComplex.estate_class,
+                func.round(func.avg(ResidentialComplex.price_numeric), 2)
+            )
+            .where(ResidentialComplex.developer.isnot(None))
+            .where(ResidentialComplex.price_numeric.isnot(None))
+            .group_by(
+                ResidentialComplex.developer,
+                ResidentialComplex.district,
+                ResidentialComplex.estate_class
+            )
+        )
+        developers = dev_query.all()
+
+        return districts, classes, developers
