@@ -72,12 +72,6 @@ async def process_finish(message: Message, state: FSMContext):
 
 @router.message(AddComplex.price)
 async def process_price(message: Message, state: FSMContext):
-    await state.update_data(price=message.text)
-    await state.set_state(AddComplex.price_numeric)
-    await message.answer("Введите числовую цену (для аналитики, только цифры):")
-
-@router.message(AddComplex.price)
-async def process_price(message: Message, state: FSMContext):
     if not message.text.isdigit():
         await message.answer("Требуется число. Введите цену (только цифры):")
         return
