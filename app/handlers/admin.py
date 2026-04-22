@@ -76,9 +76,30 @@ async def process_price(message: Message, state: FSMContext):
         await message.answer("Требуется число. Введите цену (только цифры):")
         return
     await state.update_data(price=int(message.text))
+    await state.set_state(AddComplex.avg_area)
+    await message.answer("Введите среднюю площадь (число):", reply_markup=ReplyKeyboardRemove())
+
+@router.message(AddComplex.avg_area)
+async def process_avg_area(message: Message, state: FSMContext):
+    try:
+        val = float(message.text.replace(',', '.'))
+    except ValueError:
+        await message.answer("Требуется число. Введите среднюю площадь:")
+        return
+    await state.update_data(avg_area=val)
+    await state.set_state(AddComplex.ceiling_height)
+    await message.answer("Введите высоту потолков (число):")
+
+@router.message(AddComplex.ceiling_height)
+async def process_ceiling_height(message: Message, state: FSMContext):
+    try:
+        val = float(message.text.replace(',', '.'))
+    except ValueError:
+        await message.answer("Требуется число. Введите высоту потолков:")
+        return
+    await state.update_data(ceiling_height=val)
     await state.set_state(AddComplex.floors)
     await message.answer("Введите этажность (число или диапазон, например 14-16):")
-
 
 @router.message(EditComplex.input_value)
 async def edit_stage_final(message: Message, state: FSMContext):
@@ -92,6 +113,12 @@ async def edit_stage_final(message: Message, state: FSMContext):
             await message.answer("Требуется число. Введите заново:")
             return
         new_value = int(new_value)
+    elif field_to_update in ["avg_area", "ceiling_height"]:
+        try:
+            new_value = float(new_value.replace(',', '.'))
+        except ValueError:
+            await message.answer("Требуется число. Введите заново:")
+            return
 
     await update_complex_field(complex_id, field_to_update, new_value)
 

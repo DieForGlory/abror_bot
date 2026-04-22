@@ -85,6 +85,8 @@ def get_fields_to_edit_kb() -> InlineKeyboardMarkup:
         "name": "Название",
         "developer": "Застройщик",
         "price": "Цена",
+        "avg_area": "Ср. площадь",
+        "ceiling_height": "Высота потолков",
         "current_stage": "Этап",
         "deadline": "Срок сдачи",
         "finish_type": "Отделка",

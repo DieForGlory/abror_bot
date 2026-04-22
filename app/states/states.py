@@ -7,6 +7,8 @@ class AddComplex(StatesGroup):
     estate_class = State()
     finish_type = State()
     price = State()
+    avg_area = State()
+    ceiling_height = State()
     floors = State()
     amenities = State()
     deadline = State()

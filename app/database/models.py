@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, String, BigInteger, Text, DateTime, ForeignKey, func
+from sqlalchemy import Integer, String, BigInteger, Text, DateTime, ForeignKey, func,Float
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from datetime import datetime
 
@@ -30,6 +30,8 @@ class ResidentialComplex(Base):
     estate_class: Mapped[str] = mapped_column(String(100), nullable=False)
     finish_type: Mapped[str] = mapped_column(String(100))
     price: Mapped[int] = mapped_column(Integer, nullable=True)
+    avg_area: Mapped[float] = mapped_column(Float, nullable=True)
+    ceiling_height: Mapped[float] = mapped_column(Float, nullable=True)
     developer: Mapped[str] = mapped_column(String(255), nullable=True)
     floors: Mapped[str] = mapped_column(String(100))
     amenities: Mapped[str] = mapped_column(Text)

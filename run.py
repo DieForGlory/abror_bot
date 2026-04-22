@@ -1,7 +1,9 @@
 import asyncio
 import aiohttp
 from aiogram import Bot, Dispatcher
+import logging
 
+logging.basicConfig(level=logging.INFO)
 _orig_connector_init = aiohttp.TCPConnector.__init__
 
 def _patched_connector_init(self, *args, **kwargs):
