@@ -22,8 +22,10 @@ class EditComplex(StatesGroup):
     choice_class = State()
     choice_complex = State()
     action_select = State()
+    upload_floor_plan = State()
     choice_field = State()
     input_value = State()
+    upload_photo = State()
 
 class RequestReview(StatesGroup):
     name = State()

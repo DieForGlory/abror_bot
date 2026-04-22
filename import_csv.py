@@ -1,48 +1,62 @@
-import csv
+import pandas as pd
 import asyncio
-from app.database.engine import async_session
+from app.database.engine import async_session, engine
 from app.database.models import ResidentialComplex
 
 
 async def import_data(file_path: str):
+    # Чтение Excel файла
+    df = pd.read_excel(file_path)
+
+    # Очистка заголовков
+    df.columns = df.columns.str.strip()
+
+    # Фильтрация пустых строк
+    df = df.dropna(subset=['Название ЖК'])
+
+    # Приведение типов и очистка данных
+    def clean_float(value):
+        if pd.isna(value): return None
+        try:
+            return float(str(value).replace(' м', '').replace(',', '.').strip())
+        except:
+            return None
+
+    def clean_int(value):
+        if pd.isna(value): return None
+        try:
+            return int(float(str(value).replace(' ', '').strip()))
+        except:
+            return None
+
+    inserted = 0
     async with async_session() as session:
-        with open(file_path, mode='r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                # Очистка и преобразование высоты потолков (например, "3 м" -> 3.0)
-                ceiling_raw = row.get('Высота потолков', '').replace(' м', '').replace(',', '.').strip()
-                ceiling_height = float(ceiling_raw) if ceiling_raw else None
-
-                # Преобразование цены
-                price_raw = row.get('Средняя цена', '').strip()
-                price = int(float(price_raw)) if price_raw else None
-
-                # Преобразование площади
-                area_raw = row.get('Средняя площадь', '').replace(',', '.').strip()
-                avg_area = float(area_raw) if area_raw else None
-
-                # Создание объекта
-                complex_obj = ResidentialComplex(
-                    name=row.get('Название ЖК', ''),
-                    district=row.get('Район', ''),
-                    estate_class=row.get('Класс ЖК', ''),
-                    finish_type=row.get('Вид отделки', ''),
-                    price=price,
-                    avg_area=avg_area,
-                    ceiling_height=ceiling_height,
-                    developer=row.get('Застройщик', ''),
-                    floors=row.get('Этажность', ''),
-                    amenities=row.get('Описание', ''),  # Описание загружается в amenities
-                    deadline=row.get('Дата сдачи', ''),
-                    current_stage='',
-                    location_link=None
-                )
-                session.add(complex_obj)
+        for _, row in df.iterrows():
+            complex_obj = ResidentialComplex(
+                name=str(row.get('Название ЖК')).strip(),
+                district=str(row.get('Район', '')).strip(),
+                developer=str(row.get('Застройщик', '')).strip(),
+                estate_class=str(row.get('Класс ЖК', '')).strip(),
+                floors=str(row.get('Этажность', '')).strip(),
+                ceiling_height=clean_float(row.get('Высота потолков')),
+                finish_type=str(row.get('Вид отделки', '')).strip(),
+                deadline=str(row.get('Дата сдачи', '')).strip(),
+                avg_area=clean_float(row.get('Средняя площадь')),
+                price=clean_int(row.get('Средняя цена')),
+                amenities=str(row.get('Описание', '')).strip(),
+                current_stage='Данные загружены из базы',
+                location_link=None
+            )
+            session.add(complex_obj)
+            inserted += 1
 
         await session.commit()
 
+    await engine.dispose()
+    print(f"Импорт завершен. Добавлено объектов: {inserted}")
+
 
 if __name__ == '__main__':
-    # Указать точное имя файла
-    csv_file_path = 'domtut_analytics_base_uzs (2).xlsx'
-    asyncio.run(import_data(csv_file_path))
+    # Файл должен находиться в той же папке, что и скрипт
+    file_name = 'domtut_analytics_base_uzs (2).xlsx'
+    asyncio.run(import_data(file_name))

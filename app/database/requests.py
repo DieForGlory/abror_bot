@@ -52,7 +52,19 @@ async def add_floor_plan(complex_id: int, file_id: str):
         new_plan = FloorPlan(complex_id=complex_id, telegram_file_id=file_id)
         session.add(new_plan)
         await session.commit()
+async def delete_floor_plan(plan_id: int):
+    async with async_session() as session:
+        await session.execute(delete(FloorPlan).where(FloorPlan.id == plan_id))
+        await session.commit()
+async def get_photos(complex_id: int):
+    async with async_session() as session:
+        result = await session.execute(select(Photo).where(Photo.complex_id == complex_id))
+        return result.scalars().all()
 
+async def delete_photo(photo_id: int):
+    async with async_session() as session:
+        await session.execute(delete(Photo).where(Photo.id == photo_id))
+        await session.commit()
 
 async def update_complex_field(complex_id: int, field_name: str, new_value: Any):
     async with async_session() as session:

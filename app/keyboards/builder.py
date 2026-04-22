@@ -16,8 +16,26 @@ def get_main_menu_kb(is_admin: bool) -> ReplyKeyboardMarkup:
 def get_complex_actions_kb(complex_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Редактировать", callback_data=f"action_edit_{complex_id}")
+    builder.button(text="Фотографии", callback_data=f"action_photo_{complex_id}")
+    builder.button(text="Планировки", callback_data=f"action_plan_{complex_id}")
     builder.button(text="Удалить", callback_data=f"action_del_{complex_id}")
-    builder.adjust(2)
+    builder.adjust(2, 2)
+    return builder.as_markup()
+
+def get_plan_manage_kb(complex_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Добавить планировку", callback_data=f"plan_add_{complex_id}")
+    builder.button(text="Удалить планировку", callback_data=f"plan_del_{complex_id}")
+    builder.button(text="Назад", callback_data=f"editcomp_{complex_id}")
+    builder.adjust(2, 1)
+    return builder.as_markup()
+
+def get_photo_manage_kb(complex_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Добавить фото", callback_data=f"photo_add_{complex_id}")
+    builder.button(text="Удалить фото", callback_data=f"photo_del_{complex_id}")
+    builder.button(text="Назад", callback_data=f"editcomp_{complex_id}")
+    builder.adjust(2, 1)
     return builder.as_markup()
 
 def get_floor_plans_kb(complex_id: int) -> InlineKeyboardMarkup:
@@ -30,7 +48,7 @@ def get_districts_kb() -> InlineKeyboardMarkup:
     districts = [
         "Алмазарский", "Бектемирский", "Мирабадский", "Мирзо-Улугбекский",
         "Сергелийский", "Учтепинский", "Чиланзарский", "Шайхантахурский",
-        "Юнусабадский", "Яккасарайский", "Янгихаётский", "Яшнободский"
+        "Юнусабадский", "Яккасарайский", "Янгихаётский", "Яшнабадский"
     ]
     for d in districts:
         builder.button(text=d, callback_data=f"dist_{d}")
@@ -39,7 +57,7 @@ def get_districts_kb() -> InlineKeyboardMarkup:
 
 def get_classes_kb(district: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    classes = ["Comfort", "Business", "Premium"]
+    classes = ["Комфорт", "Бизнес", "Премиум"]
     for c in classes:
         builder.button(text=c, callback_data=f"class_{district}_{c}")
     builder.adjust(1)
@@ -57,7 +75,7 @@ def get_edit_districts_kb() -> InlineKeyboardMarkup:
     districts = [
         "Алмазарский", "Бектемирский", "Мирабадский", "Мирзо-Улугбекский",
         "Сергелийский", "Учтепинский", "Чиланзарский", "Шайхантахурский",
-        "Юнусабадский", "Яккасарайский", "Янгихаётский", "Яшнободский"
+        "Юнусабадский", "Яккасарайский", "Янгихаётский", "Яшнабадский"
     ]
     for d in districts:
         builder.button(text=d, callback_data=f"editdist_{d}")
@@ -66,7 +84,7 @@ def get_edit_districts_kb() -> InlineKeyboardMarkup:
 
 def get_edit_classes_kb(district: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    classes = ["Comfort", "Business", "Premium"]
+    classes = ["Комфорт", "Бизнес", "Премиум"]
     for c in classes:
         builder.button(text=c, callback_data=f"editclass_{district}_{c}")
     builder.adjust(1)
@@ -104,7 +122,7 @@ def get_admin_districts_kb() -> ReplyKeyboardMarkup:
     districts = [
         "Алмазарский", "Бектемирский", "Мирабадский", "Мирзо-Улугбекский",
         "Сергелийский", "Учтепинский", "Чиланзарский", "Шайхантахурский",
-        "Юнусабадский", "Яккасарайский", "Янгихаётский", "Яшнободский"
+        "Юнусабадский", "Яккасарайский", "Янгихаётский", "Яшнабадский"
     ]
     for d in districts:
         builder.button(text=d)
@@ -112,7 +130,7 @@ def get_admin_districts_kb() -> ReplyKeyboardMarkup:
 
 def get_admin_classes_kb() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
-    classes = ["Comfort", "Business", "Premium"]
+    classes = ["Комфорт", "Бизнес", "Премиум"]
     for c in classes:
         builder.button(text=c)
     return builder.adjust(3).as_markup(resize_keyboard=True, one_time_keyboard=True)
