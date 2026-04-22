@@ -6,12 +6,17 @@ def format_complex_info(c: ResidentialComplex) -> str:
     link_text = f"<a href='{c.location_link}'>Открыть на карте</a>" if c.location_link and c.location_link != "-" else "Не указана"
     developer_text = c.developer if c.developer else "Не указан"
 
+    avg_area_text = c.avg_area if c.avg_area else "Не указана"
+    ceiling_text = c.ceiling_height if c.ceiling_height else "Не указана"
+
     return (
         f"🏢 <b>{c.name}</b>\n\n"
         f"🏗 <b>Застройщик:</b> {developer_text}\n"
         f"📍 <b>Район:</b> {c.district}\n"
         f"💎 <b>Класс:</b> {c.estate_class}\n"
         f"🏗 <b>Этажность:</b> {c.floors}\n"
+        f"📏 <b>Средняя площадь:</b> {avg_area_text}\n"
+        f"⬆️ <b>Высота потолков:</b> {ceiling_text}\n"
         f"🛠 <b>Отделка:</b> {c.finish_type}\n"
         f"💰 <b>Цена:</b> {c.price}\n"
         f"📅 <b>Срок сдачи:</b> {c.deadline}\n"
