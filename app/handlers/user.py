@@ -4,6 +4,8 @@ from aiogram.types import CallbackQuery, InputMediaPhoto, Message, ReplyKeyboard
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 from aiogram.fsm.state import any_state
+from aiogram.filters import CommandStart
+from aiogram.types import ReplyKeyboardRemove
 
 from app.database.requests import (
     register_user, get_user_by_id, update_user_registration, get_admins,
@@ -22,10 +24,12 @@ router = Router()
 
 # --- БЛОК АВТОРИЗАЦИИ И РЕГИСТРАЦИИ ---
 
-@router.message(CommandStart())
+@router.message(CommandStart(), StateFilter(any_state))
 async def cmd_start(message: Message, state: FSMContext):
     await register_user(message.from_user.id, message.from_user.username)
     user = await get_user_by_id(message.from_user.id)
+
+    await state.clear()
 
     if user.role == 'admin' or user.status == 'approved':
         await message.answer("Доступ разрешен.", reply_markup=get_main_menu_kb(user.role == 'admin'))

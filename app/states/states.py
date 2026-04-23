@@ -26,6 +26,7 @@ class UserSearch(StatesGroup):
 
 class RequestReview(StatesGroup):
     name = State()
+    comment = State()
 
 class EditComplex(StatesGroup):
     choice_district = State()
@@ -36,10 +37,3 @@ class EditComplex(StatesGroup):
     choice_field = State()
     input_value = State()
     upload_photo = State()
-
-class RequestReview(StatesGroup):
-    name = State()
-    comment = State()
-
-class UserSearch(StatesGroup):
-    input_name = State()
