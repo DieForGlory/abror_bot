@@ -12,7 +12,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(255), nullable=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=True)
     phone: Mapped[str] = mapped_column(String(50), nullable=True)
-    status: Mapped[str] = mapped_column(String(50), default='pending')
+    status: Mapped[str] = mapped_column(String(50), server_default='pending')
 
 class ComplexUpdateHistory(Base):
     __tablename__ = 'complex_update_history'
