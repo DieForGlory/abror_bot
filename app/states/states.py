@@ -17,6 +17,10 @@ class AddComplex(StatesGroup):
     photos = State()
     floor_plans = State()
 
+class Registration(StatesGroup):
+    full_name = State()
+    phone = State()
+
 class EditComplex(StatesGroup):
     choice_district = State()
     choice_class = State()

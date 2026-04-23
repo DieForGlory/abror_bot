@@ -46,7 +46,30 @@ async def add_photo(complex_id: int, file_id: str):
         session.add(new_photo)
         await session.commit()
 
+async def get_user_by_id(tg_id: int):
+    async with async_session() as session:
+        return await session.get(User, tg_id)
 
+async def update_user_registration(tg_id: int, full_name: str, phone: str):
+    async with async_session() as session:
+        stmt = update(User).where(User.telegram_id == tg_id).values(
+            full_name=full_name,
+            phone=phone,
+            status='pending_approval'
+        )
+        await session.execute(stmt)
+        await session.commit()
+
+async def update_user_status(tg_id: int, status: str):
+    async with async_session() as session:
+        stmt = update(User).where(User.telegram_id == tg_id).values(status=status)
+        await session.execute(stmt)
+        await session.commit()
+
+async def get_admins():
+    async with async_session() as session:
+        result = await session.execute(select(User.telegram_id).where(User.role == 'admin'))
+        return result.scalars().all()
 async def add_floor_plan(complex_id: int, file_id: str):
     async with async_session() as session:
         new_plan = FloorPlan(complex_id=complex_id, telegram_file_id=file_id)

@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.types import ReplyKeyboardRemove
 
 def get_main_menu_kb(is_admin: bool) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
@@ -20,6 +21,18 @@ def get_complex_actions_kb(complex_id: int) -> InlineKeyboardMarkup:
     builder.button(text="Планировки", callback_data=f"action_plan_{complex_id}")
     builder.button(text="Удалить", callback_data=f"action_del_{complex_id}")
     builder.adjust(2, 2)
+    return builder.as_markup()
+
+def get_contact_kb() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.button(text="Отправить контакт", request_contact=True)
+    return builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
+
+def get_admin_approve_kb(user_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Принять", callback_data=f"approve_{user_id}")
+    builder.button(text="Отклонить", callback_data=f"reject_{user_id}")
+    builder.adjust(2)
     return builder.as_markup()
 
 def get_plan_manage_kb(complex_id: int) -> InlineKeyboardMarkup:
@@ -97,11 +110,13 @@ def get_edit_complexes_kb(complexes: list) -> InlineKeyboardMarkup:
     builder.adjust(1)
     return builder.as_markup()
 
-def get_fields_to_edit_kb() -> InlineKeyboardMarkup:
+
+def get_fields_to_edit_kb(complex_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     fields = {
         "name": "Название",
         "developer": "Застройщик",
+        "estate_class": "Класс ЖК",
         "price": "Цена",
         "avg_area": "Ср. площадь",
         "ceiling_height": "Высота потолков",
@@ -114,6 +129,8 @@ def get_fields_to_edit_kb() -> InlineKeyboardMarkup:
     }
     for col, txt in fields.items():
         builder.button(text=txt, callback_data=f"field_{col}")
+
+    builder.button(text="✅ Завершить", callback_data=f"finish_edit_{complex_id}")
     builder.adjust(2)
     return builder.as_markup()
 

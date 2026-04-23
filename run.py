@@ -16,6 +16,7 @@ from app.config import settings
 from app.handlers.common import router as common_router
 from app.handlers.admin import router as admin_router
 from app.handlers.user import router as user_router
+from app.middlewares.status_check import StatusMiddleware
 
 async def main():
     bot = Bot(token=settings.BOT_TOKEN)
@@ -24,6 +25,8 @@ async def main():
     dp.include_router(common_router)
     dp.include_router(admin_router)
     dp.include_router(user_router)
+    dp.message.middleware(StatusMiddleware())
+    dp.callback_query.middleware(StatusMiddleware())
 
     await dp.start_polling(bot)
 

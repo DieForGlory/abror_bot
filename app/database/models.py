@@ -10,6 +10,9 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     role: Mapped[str] = mapped_column(String(50), default='user')
     username: Mapped[str] = mapped_column(String(255), nullable=True)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default='pending')
 
 class ComplexUpdateHistory(Base):
     __tablename__ = 'complex_update_history'

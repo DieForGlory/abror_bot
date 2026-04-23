@@ -8,6 +8,7 @@ from app.database.requests import (
     add_complex, add_photo, add_floor_plan, get_complexes_by_filter,
     update_complex_field, delete_complex, get_complex_by_id
 )
+from app.database.requests import update_user_status
 from app.database.requests import delete_floor_plan, get_floor_plans
 from app.keyboards.builder import get_plan_manage_kb
 from app.utils.broadcaster import broadcast_new_complex
@@ -127,11 +128,21 @@ async def edit_stage_final(message: Message, state: FSMContext):
 
     await update_complex_field(complex_id, field_to_update, new_value)
 
+    await state.set_state(EditComplex.choice_field)
+    await message.answer("Значение обновлено. Выберите следующее поле или завершите:", reply_markup=get_fields_to_edit_kb(complex_id))
+
+
+@router.callback_query(EditComplex.choice_field, F.data.startswith("finish_edit_"))
+async def finish_complex_editing(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
     c = await get_complex_by_id(complex_id)
-    await broadcast_new_complex(message.bot, complex_id, c.name, is_update=True)
+
+    await broadcast_new_complex(callback.bot, complex_id, c.name, is_update=True)
 
     await state.clear()
-    await message.answer("Данные обновлены.", reply_markup=get_main_menu_kb(True))
+    await callback.message.delete()
+    await callback.message.answer("Редактирование завершено. Уведомления разосланы.",
+                                  reply_markup=get_main_menu_kb(True))
 
 @router.message(AddComplex.floors)
 async def process_floors(message: Message, state: FSMContext):
@@ -146,6 +157,25 @@ async def process_amenities(message: Message, state: FSMContext):
     await state.set_state(AddComplex.deadline)
     await message.answer("Введите срок сдачи:")
 
+@router.callback_query(F.data.startswith("approve_"))
+async def process_approve_user(callback: CallbackQuery):
+    user_id = int(callback.data.split("_")[1])
+    await update_user_status(user_id, 'approved')
+    await callback.message.edit_text(callback.message.text + "\n\nСтатус: Принято")
+    try:
+        await callback.bot.send_message(user_id, "Заявка одобрена. Доступ открыт.", reply_markup=get_main_menu_kb(False))
+    except Exception:
+        pass
+
+@router.callback_query(F.data.startswith("reject_"))
+async def process_reject_user(callback: CallbackQuery):
+    user_id = int(callback.data.split("_")[1])
+    await update_user_status(user_id, 'rejected')
+    await callback.message.edit_text(callback.message.text + "\n\nСтатус: Отклонено")
+    try:
+        await callback.bot.send_message(user_id, "Заявка на доступ отклонена.")
+    except Exception:
+        pass
 
 @router.message(AddComplex.deadline)
 async def process_deadline(message: Message, state: FSMContext):
@@ -255,8 +285,9 @@ async def process_delete(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(EditComplex.action_select, F.data.startswith("action_edit_"))
 async def process_edit_field(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
     await state.set_state(EditComplex.choice_field)
-    await callback.message.edit_text("Что именно нужно изменить?", reply_markup=get_fields_to_edit_kb())
+    await callback.message.edit_text("Что именно нужно изменить?", reply_markup=get_fields_to_edit_kb(complex_id))
 
 
 @router.callback_query(EditComplex.choice_field, F.data.startswith("field_"))
@@ -269,6 +300,8 @@ async def edit_stage_field(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Выберите новый этап:", reply_markup=get_admin_stage_kb())
     elif field_name == "finish_type":
         await callback.message.answer("Выберите тип отделки:", reply_markup=get_admin_finish_kb())
+    elif field_name == "estate_class":
+        await callback.message.answer("Выберите новый класс ЖК:", reply_markup=get_admin_classes_kb())
     else:
         await callback.message.answer("Введите новое значение для этого поля:", reply_markup=ReplyKeyboardRemove())
 
