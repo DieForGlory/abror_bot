@@ -6,7 +6,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.state import any_state
 from aiogram.filters import CommandStart
 from aiogram.types import ReplyKeyboardRemove
-
+from app.config import settings
 from app.database.requests import (
     register_user, get_user_by_id, update_user_registration, get_admins,
     get_complexes_by_filter, get_complex_by_id, search_complexes_by_name,
@@ -31,10 +31,14 @@ async def cmd_start(message: Message, state: FSMContext):
 
     await state.clear()
 
-    if user.role == 'admin' or user.status == 'approved':
-        await message.answer("Доступ разрешен.", reply_markup=get_main_menu_kb(user.role == 'admin'))
+    # Добавляем проверку по списку ID из .env (settings.admin_list)
+    is_admin = message.from_user.id in settings.admin_list or user.role == 'admin'
+
+    if is_admin or user.status == 'approved':
+        await message.answer("Доступ разрешен.", reply_markup=get_main_menu_kb(is_admin))
         return
 
+    # Если статус не approved, проверяем другие состояния
     if user.status == 'rejected':
         await message.answer("Доступ запрещен.", reply_markup=ReplyKeyboardRemove())
         return
@@ -43,6 +47,7 @@ async def cmd_start(message: Message, state: FSMContext):
         await message.answer("Заявка находится на рассмотрении.", reply_markup=ReplyKeyboardRemove())
         return
 
+    # Если мы здесь, значит статус 'pending' (новый пользователь)
     await state.set_state(Registration.full_name)
     await message.answer("Регистрация. Введите ваше ФИО:", reply_markup=ReplyKeyboardRemove())
 
@@ -74,13 +79,28 @@ async def process_phone(message: Message, state: FSMContext, phone: str):
     await message.answer("Данные отправлены. Ожидайте подтверждения администратором.",
                          reply_markup=ReplyKeyboardRemove())
 
-    admins = await get_admins()
-    admin_text = f"Заявка на доступ:\nФИО: {full_name}\nТелефон: {phone}\nID: {tg_id}\nUsername: @{message.from_user.username}"
-    for admin_id in admins:
+    # Получаем админов из БД и объединяем с админами из .env (используем set для удаления дубликатов)
+    db_admins = await get_admins()
+    all_admins = set(settings.admin_list + db_admins)
+
+    admin_text = (
+        f"🔔 <b>Новая заявка на доступ:</b>\n\n"
+        f"👤 ФИО: {full_name}\n"
+        f"📱 Телефон: {phone}\n"
+        f"🆔 ID: {tg_id}\n"
+        f"🔗 Username: @{message.from_user.username or 'отсутствует'}"
+    )
+
+    for admin_id in all_admins:
         try:
-            await message.bot.send_message(admin_id, admin_text, reply_markup=get_admin_approve_kb(tg_id))
-        except Exception:
-            pass
+            await message.bot.send_message(
+                chat_id=admin_id,
+                text=admin_text,
+                reply_markup=get_admin_approve_kb(tg_id),
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            print(f"Не удалось отправить уведомление админу {admin_id}: {e}")
 
 
 # --- БЛОК КАТАЛОГА ЖК ---

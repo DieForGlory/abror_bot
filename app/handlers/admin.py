@@ -3,38 +3,38 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
+from aiogram.fsm.state import any_state
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from app.states.states import AddComplex, EditComplex
 from app.database.requests import (
     add_complex, add_photo, add_floor_plan, get_complexes_by_filter,
-    update_complex_field, delete_complex, get_complex_by_id
+    update_complex_field, delete_complex, get_complex_by_id,
+    update_user_status, delete_floor_plan, get_floor_plans,
+    get_analytics_data, get_photos, delete_photo
 )
-from app.database.requests import update_user_status
-from app.database.requests import delete_floor_plan, get_floor_plans
-from app.keyboards.builder import get_plan_manage_kb
-from app.utils.broadcaster import broadcast_new_complex
-from app.middlewares.role_check import AdminMiddleware
 from app.keyboards.builder import (
     get_admin_districts_kb, get_admin_classes_kb, get_admin_finish_kb, get_admin_stage_kb,
     get_edit_districts_kb, get_edit_classes_kb, get_edit_complexes_kb, get_fields_to_edit_kb,
-    get_complex_actions_kb, get_main_menu_kb
+    get_complex_actions_kb, get_main_menu_kb, get_plan_manage_kb, get_photo_manage_kb
 )
-from aiogram.fsm.state import any_state
-from app.config import settings
-from app.database.requests import get_analytics_data
-from app.database.requests import get_photos, delete_photo
-from app.keyboards.builder import get_photo_manage_kb
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from app.utils.broadcaster import broadcast_new_complex
+from app.middlewares.role_check import AdminMiddleware
 
 router = Router()
 router.message.middleware(AdminMiddleware())
 router.callback_query.middleware(AdminMiddleware())
 
+
 def format_price(value):
     if value is None:
         return "Нет данных"
-    # Преобразуем во float для обработки возможного Decimal/Float из AVG(),
-    # Форматируем с запятыми, затем заменяем запятые на точки
     return f"{float(value):,.0f}".replace(",", ".")
+
+
+# ==========================================
+# БЛОК 1: ДОБАВЛЕНИЕ НОВОГО ЖК
+# ==========================================
 
 @router.message(F.text == "➕ Добавить ЖК", StateFilter(any_state))
 async def admin_add_start(message: Message, state: FSMContext):
@@ -49,11 +49,13 @@ async def process_name(message: Message, state: FSMContext):
     await state.set_state(AddComplex.developer)
     await message.answer("Введите застройщика:", reply_markup=ReplyKeyboardRemove())
 
+
 @router.message(AddComplex.developer)
 async def process_developer(message: Message, state: FSMContext):
     await state.update_data(developer=message.text)
     await state.set_state(AddComplex.district)
     await message.answer("Выберите район:", reply_markup=get_admin_districts_kb())
+
 
 @router.message(AddComplex.district)
 async def process_district(message: Message, state: FSMContext):
@@ -85,6 +87,7 @@ async def process_price(message: Message, state: FSMContext):
     await state.set_state(AddComplex.avg_area)
     await message.answer("Введите среднюю площадь (число):", reply_markup=ReplyKeyboardRemove())
 
+
 @router.message(AddComplex.avg_area)
 async def process_avg_area(message: Message, state: FSMContext):
     try:
@@ -95,6 +98,7 @@ async def process_avg_area(message: Message, state: FSMContext):
     await state.update_data(avg_area=val)
     await state.set_state(AddComplex.ceiling_height)
     await message.answer("Введите высоту потолков (число):")
+
 
 @router.message(AddComplex.ceiling_height)
 async def process_ceiling_height(message: Message, state: FSMContext):
@@ -107,42 +111,6 @@ async def process_ceiling_height(message: Message, state: FSMContext):
     await state.set_state(AddComplex.floors)
     await message.answer("Введите этажность (число или диапазон, например 14-16):")
 
-@router.message(EditComplex.input_value)
-async def edit_stage_final(message: Message, state: FSMContext):
-    data = await state.get_data()
-    complex_id = data['complex_id']
-    field_to_update = data['field_to_update']
-
-    new_value = message.text
-    if field_to_update == "price":
-        if not new_value.isdigit():
-            await message.answer("Требуется число. Введите заново:")
-            return
-        new_value = int(new_value)
-    elif field_to_update in ["avg_area", "ceiling_height"]:
-        try:
-            new_value = float(new_value.replace(',', '.'))
-        except ValueError:
-            await message.answer("Требуется число. Введите заново:")
-            return
-
-    await update_complex_field(complex_id, field_to_update, new_value)
-
-    await state.set_state(EditComplex.choice_field)
-    await message.answer("Значение обновлено. Выберите следующее поле или завершите:", reply_markup=get_fields_to_edit_kb(complex_id))
-
-
-@router.callback_query(EditComplex.choice_field, F.data.startswith("finish_edit_"))
-async def finish_complex_editing(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    c = await get_complex_by_id(complex_id)
-
-    await broadcast_new_complex(callback.bot, complex_id, c.name, is_update=True)
-
-    await state.clear()
-    await callback.message.delete()
-    await callback.message.answer("Редактирование завершено. Уведомления разосланы.",
-                                  reply_markup=get_main_menu_kb(True))
 
 @router.message(AddComplex.floors)
 async def process_floors(message: Message, state: FSMContext):
@@ -157,25 +125,6 @@ async def process_amenities(message: Message, state: FSMContext):
     await state.set_state(AddComplex.deadline)
     await message.answer("Введите срок сдачи:")
 
-@router.callback_query(F.data.startswith("approve_"))
-async def process_approve_user(callback: CallbackQuery):
-    user_id = int(callback.data.split("_")[1])
-    await update_user_status(user_id, 'approved')
-    await callback.message.edit_text(callback.message.text + "\n\nСтатус: Принято")
-    try:
-        await callback.bot.send_message(user_id, "Заявка одобрена. Доступ открыт.", reply_markup=get_main_menu_kb(False))
-    except Exception:
-        pass
-
-@router.callback_query(F.data.startswith("reject_"))
-async def process_reject_user(callback: CallbackQuery):
-    user_id = int(callback.data.split("_")[1])
-    await update_user_status(user_id, 'rejected')
-    await callback.message.edit_text(callback.message.text + "\n\nСтатус: Отклонено")
-    try:
-        await callback.bot.send_message(user_id, "Заявка на доступ отклонена.")
-    except Exception:
-        pass
 
 @router.message(AddComplex.deadline)
 async def process_deadline(message: Message, state: FSMContext):
@@ -233,12 +182,15 @@ async def process_done(message: Message, state: FSMContext):
     for file_id in plan_ids:
         await add_floor_plan(complex_id, file_id)
 
-    # Вызов рассылки
     await broadcast_new_complex(message.bot, complex_id, data['name'], is_update=False)
 
     await state.clear()
-    await message.answer(f"Запись сохранена.", reply_markup=get_main_menu_kb(True))
+    await message.answer("Запись сохранена.", reply_markup=get_main_menu_kb(True))
 
+
+# ==========================================
+# БЛОК 2: УПРАВЛЕНИЕ И РЕДАКТИРОВАНИЕ ЖК
+# ==========================================
 
 @router.message(F.text == "⚙️ Управление ЖК", StateFilter(any_state))
 async def admin_edit_start(message: Message, state: FSMContext):
@@ -296,6 +248,7 @@ async def edit_stage_field(callback: CallbackQuery, state: FSMContext):
     await state.update_data(field_to_update=field_name)
     await state.set_state(EditComplex.input_value)
     await callback.message.delete()
+
     if field_name == "current_stage":
         await callback.message.answer("Выберите новый этап:", reply_markup=get_admin_stage_kb())
     elif field_name == "finish_type":
@@ -305,6 +258,166 @@ async def edit_stage_field(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.answer("Введите новое значение для этого поля:", reply_markup=ReplyKeyboardRemove())
 
+
+@router.message(EditComplex.input_value)
+async def edit_stage_final(message: Message, state: FSMContext):
+    data = await state.get_data()
+    complex_id = data['complex_id']
+    field_to_update = data['field_to_update']
+
+    new_value = message.text
+    if field_to_update == "price":
+        if not new_value.isdigit():
+            await message.answer("Требуется число. Введите заново:")
+            return
+        new_value = int(new_value)
+    elif field_to_update in ["avg_area", "ceiling_height"]:
+        try:
+            new_value = float(new_value.replace(',', '.'))
+        except ValueError:
+            await message.answer("Требуется число. Введите заново:")
+            return
+
+    await update_complex_field(complex_id, field_to_update, new_value)
+    await state.set_state(EditComplex.choice_field)
+    await message.answer("Значение обновлено. Выберите следующее поле или завершите:",
+                         reply_markup=get_fields_to_edit_kb(complex_id))
+
+
+@router.callback_query(EditComplex.choice_field, F.data.startswith("finish_edit_"))
+async def finish_complex_editing(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    c = await get_complex_by_id(complex_id)
+
+    await broadcast_new_complex(callback.bot, complex_id, c.name, is_update=True)
+
+    await state.clear()
+    await callback.message.delete()
+    await callback.message.answer("Редактирование завершено. Уведомления разосланы.",
+                                  reply_markup=get_main_menu_kb(True))
+
+
+# ==========================================
+# БЛОК 3: УПРАВЛЕНИЕ ФОТОГРАФИЯМИ И ПЛАНИРОВКАМИ
+# ==========================================
+
+# --- Фотографии ---
+@router.callback_query(EditComplex.action_select, F.data.startswith("action_photo_"))
+async def process_manage_photos(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    await callback.message.edit_text("Управление фотографиями:", reply_markup=get_photo_manage_kb(complex_id))
+
+
+@router.callback_query(EditComplex.action_select, F.data.startswith("photo_add_"))
+async def process_photo_add(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    await state.update_data(complex_id=complex_id)
+    await state.set_state(EditComplex.upload_photo)
+    await callback.message.edit_text("Отправьте фотографии по одной. Для завершения отправьте /done_photo")
+
+
+@router.message(EditComplex.upload_photo, F.photo)
+async def handle_new_photo(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await add_photo(data['complex_id'], message.photo[-1].file_id)
+    await message.answer("Фото загружено. Отправьте следующее или /done_photo")
+
+
+@router.message(EditComplex.upload_photo, Command("done_photo"))
+async def handle_photo_done(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await state.set_state(EditComplex.action_select)
+    await message.answer("Загрузка завершена. Выберите действие:",
+                         reply_markup=get_complex_actions_kb(data['complex_id']))
+
+
+@router.callback_query(EditComplex.action_select, F.data.startswith("photo_del_"))
+async def process_photo_delete_list(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    photos = await get_photos(complex_id)
+    if not photos:
+        await callback.answer("У этого ЖК нет фотографий", show_alert=True)
+        return
+
+    await callback.message.delete()
+    for p in photos:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="❌ Удалить фото", callback_data=f"delphoto_{p.id}_{complex_id}")
+        await callback.message.answer_photo(p.telegram_file_id, reply_markup=builder.as_markup())
+
+    builder_back = InlineKeyboardBuilder()
+    builder_back.button(text="Назад к меню ЖК", callback_data=f"editcomp_{complex_id}")
+    await callback.message.answer("Выберите фото для удаления:", reply_markup=builder_back.as_markup())
+
+
+@router.callback_query(F.data.startswith("delphoto_"))
+async def execute_photo_delete(callback: CallbackQuery, state: FSMContext):
+    _, photo_id, complex_id = callback.data.split("_")
+    await delete_photo(int(photo_id))
+    await callback.message.delete()
+    await callback.answer("Фото удалено", show_alert=False)
+
+
+# --- Планировки ---
+@router.callback_query(EditComplex.action_select, F.data.startswith("action_plan_"))
+async def process_manage_plans(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    await callback.message.edit_text("Управление планировками:", reply_markup=get_plan_manage_kb(complex_id))
+
+
+@router.callback_query(EditComplex.action_select, F.data.startswith("plan_add_"))
+async def process_plan_add(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    await state.update_data(complex_id=complex_id)
+    await state.set_state(EditComplex.upload_floor_plan)
+    await callback.message.edit_text("Отправьте планировки по одной. Для завершения отправьте /done_plan")
+
+
+@router.message(EditComplex.upload_floor_plan, F.photo)
+async def handle_new_plan(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await add_floor_plan(data['complex_id'], message.photo[-1].file_id)
+    await message.answer("Планировка загружена. Отправьте следующую или /done_plan")
+
+
+@router.message(EditComplex.upload_floor_plan, Command("done_plan"))
+async def handle_plan_done(message: Message, state: FSMContext):
+    data = await state.get_data()
+    await state.set_state(EditComplex.action_select)
+    await message.answer("Загрузка завершена. Выберите действие:",
+                         reply_markup=get_complex_actions_kb(data['complex_id']))
+
+
+@router.callback_query(EditComplex.action_select, F.data.startswith("plan_del_"))
+async def process_plan_delete_list(callback: CallbackQuery, state: FSMContext):
+    complex_id = int(callback.data.split("_")[2])
+    plans = await get_floor_plans(complex_id)
+    if not plans:
+        await callback.answer("У этого ЖК нет планировок", show_alert=True)
+        return
+
+    await callback.message.delete()
+    for p in plans:
+        builder = InlineKeyboardBuilder()
+        builder.button(text="❌ Удалить планировку", callback_data=f"delplan_{p.id}_{complex_id}")
+        await callback.message.answer_photo(p.telegram_file_id, reply_markup=builder.as_markup())
+
+    builder_back = InlineKeyboardBuilder()
+    builder_back.button(text="Назад к меню ЖК", callback_data=f"editcomp_{complex_id}")
+    await callback.message.answer("Выберите планировку для удаления:", reply_markup=builder_back.as_markup())
+
+
+@router.callback_query(F.data.startswith("delplan_"))
+async def execute_plan_delete(callback: CallbackQuery, state: FSMContext):
+    _, plan_id, complex_id = callback.data.split("_")
+    await delete_floor_plan(int(plan_id))
+    await callback.message.delete()
+    await callback.answer("Планировка удалена", show_alert=False)
+
+
+# ==========================================
+# БЛОК 4: АНАЛИТИКА
+# ==========================================
 
 @router.message(F.text == "📊 Аналитика рынка", StateFilter(any_state))
 async def admin_analytics(message: Message, state: FSMContext):
@@ -333,100 +446,29 @@ async def admin_analytics(message: Message, state: FSMContext):
 
     await message.answer(text, parse_mode="HTML")
 
-@router.callback_query(EditComplex.action_select, F.data.startswith("action_photo_"))
-async def process_manage_photos(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    await callback.message.edit_text("Управление фотографиями:", reply_markup=get_photo_manage_kb(complex_id))
 
-@router.callback_query(EditComplex.action_select, F.data.startswith("photo_add_"))
-async def process_photo_add(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    await state.update_data(complex_id=complex_id)
-    await state.set_state(EditComplex.upload_photo)
-    await callback.message.edit_text("Отправьте фотографии по одной. Для завершения отправьте /done_photo")
+# ==========================================
+# БЛОК 5: ОДОБРЕНИЕ ПОЛЬЗОВАТЕЛЕЙ
+# ==========================================
 
-@router.message(EditComplex.upload_photo, F.photo)
-async def handle_new_photo(message: Message, state: FSMContext):
-    data = await state.get_data()
-    await add_photo(data['complex_id'], message.photo[-1].file_id)
-    await message.answer("Фото загружено. Отправьте следующее или /done_photo")
+@router.callback_query(F.data.startswith("approve_"))
+async def process_approve_user(callback: CallbackQuery):
+    user_id = int(callback.data.split("_")[1])
+    await update_user_status(user_id, 'approved')
+    await callback.message.edit_text(callback.message.text + "\n\nСтатус: Принято")
+    try:
+        await callback.bot.send_message(user_id, "Заявка одобрена. Доступ открыт.",
+                                        reply_markup=get_main_menu_kb(False))
+    except Exception:
+        pass
 
-@router.message(EditComplex.upload_photo, Command("done_photo"))
-async def handle_photo_done(message: Message, state: FSMContext):
-    data = await state.get_data()
-    await state.set_state(EditComplex.action_select)
-    await message.answer("Загрузка завершена. Выберите действие:", reply_markup=get_complex_actions_kb(data['complex_id']))
 
-@router.callback_query(EditComplex.action_select, F.data.startswith("photo_del_"))
-async def process_photo_delete_list(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    photos = await get_photos(complex_id)
-    if not photos:
-        await callback.answer("У этого ЖК нет фотографий", show_alert=True)
-        return
-
-    await callback.message.delete()
-    for p in photos:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="❌ Удалить фото", callback_data=f"delphoto_{p.id}_{complex_id}")
-        await callback.message.answer_photo(p.telegram_file_id, reply_markup=builder.as_markup())
-
-    builder_back = InlineKeyboardBuilder()
-    builder_back.button(text="Назад к меню ЖК", callback_data=f"editcomp_{complex_id}")
-    await callback.message.answer("Выберите фото для удаления:", reply_markup=builder_back.as_markup())
-
-@router.callback_query(F.data.startswith("delphoto_"))
-async def execute_photo_delete(callback: CallbackQuery, state: FSMContext):
-    _, photo_id, complex_id = callback.data.split("_")
-    await delete_photo(int(photo_id))
-    await callback.message.delete()
-    await callback.answer("Фото удалено", show_alert=False)
-
-@router.callback_query(EditComplex.action_select, F.data.startswith("action_plan_"))
-async def process_manage_plans(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    await callback.message.edit_text("Управление планировками:", reply_markup=get_plan_manage_kb(complex_id))
-
-@router.callback_query(EditComplex.action_select, F.data.startswith("plan_add_"))
-async def process_plan_add(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    await state.update_data(complex_id=complex_id)
-    await state.set_state(EditComplex.upload_floor_plan)
-    await callback.message.edit_text("Отправьте планировки по одной. Для завершения отправьте /done_plan")
-
-@router.message(EditComplex.upload_floor_plan, F.photo)
-async def handle_new_plan(message: Message, state: FSMContext):
-    data = await state.get_data()
-    await add_floor_plan(data['complex_id'], message.photo[-1].file_id)
-    await message.answer("Планировка загружена. Отправьте следующую или /done_plan")
-
-@router.message(EditComplex.upload_floor_plan, Command("done_plan"))
-async def handle_plan_done(message: Message, state: FSMContext):
-    data = await state.get_data()
-    await state.set_state(EditComplex.action_select)
-    await message.answer("Загрузка завершена. Выберите действие:", reply_markup=get_complex_actions_kb(data['complex_id']))
-
-@router.callback_query(EditComplex.action_select, F.data.startswith("plan_del_"))
-async def process_plan_delete_list(callback: CallbackQuery, state: FSMContext):
-    complex_id = int(callback.data.split("_")[2])
-    plans = await get_floor_plans(complex_id)
-    if not plans:
-        await callback.answer("У этого ЖК нет планировок", show_alert=True)
-        return
-
-    await callback.message.delete()
-    for p in plans:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="❌ Удалить планировку", callback_data=f"delplan_{p.id}_{complex_id}")
-        await callback.message.answer_photo(p.telegram_file_id, reply_markup=builder.as_markup())
-
-    builder_back = InlineKeyboardBuilder()
-    builder_back.button(text="Назад к меню ЖК", callback_data=f"editcomp_{complex_id}")
-    await callback.message.answer("Выберите планировку для удаления:", reply_markup=builder_back.as_markup())
-
-@router.callback_query(F.data.startswith("delplan_"))
-async def execute_plan_delete(callback: CallbackQuery, state: FSMContext):
-    _, plan_id, complex_id = callback.data.split("_")
-    await delete_floor_plan(int(plan_id))
-    await callback.message.delete()
-    await callback.answer("Планировка удалена", show_alert=False)
+@router.callback_query(F.data.startswith("reject_"))
+async def process_reject_user(callback: CallbackQuery):
+    user_id = int(callback.data.split("_")[1])
+    await update_user_status(user_id, 'rejected')
+    await callback.message.edit_text(callback.message.text + "\n\nСтатус: Отклонено")
+    try:
+        await callback.bot.send_message(user_id, "Заявка на доступ отклонена.")
+    except Exception:
+        pass
