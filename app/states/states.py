@@ -21,6 +21,12 @@ class Registration(StatesGroup):
     full_name = State()
     phone = State()
 
+class UserSearch(StatesGroup):
+    query = State()
+
+class RequestReview(StatesGroup):
+    name = State()
+
 class EditComplex(StatesGroup):
     choice_district = State()
     choice_class = State()
