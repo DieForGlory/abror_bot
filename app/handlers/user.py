@@ -1,10 +1,9 @@
 from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, CommandObject
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import StateFilter
 from aiogram.fsm.state import any_state
-from aiogram.filters import CommandStart
 from aiogram.types import ReplyKeyboardRemove
 from app.config import settings
 from app.database.requests import (
@@ -25,20 +24,59 @@ router = Router()
 # --- БЛОК АВТОРИЗАЦИИ И РЕГИСТРАЦИИ ---
 
 @router.message(CommandStart(), StateFilter(any_state))
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, command: CommandObject):
+    # Удаление сообщения /start из чата пользователя
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
     await register_user(message.from_user.id, message.from_user.username)
     user = await get_user_by_id(message.from_user.id)
 
     await state.clear()
 
-    # Добавляем проверку по списку ID из .env (settings.admin_list)
     is_admin = message.from_user.id in settings.admin_list or user.role == 'admin'
 
     if is_admin or user.status == 'approved':
-        await message.answer("Доступ разрешен.", reply_markup=get_main_menu_kb(is_admin))
-        return
+        if command.args and command.args.startswith("complex_"):
+            complex_id = int(command.args.split("_")[1])
+            c = await get_complex_by_id(complex_id)
 
-    # Если статус не approved, проверяем другие состояния
+            if not c:
+                await message.answer("ЖК не найден.", reply_markup=get_main_menu_kb(is_admin))
+                return
+
+            photos = await get_photos(complex_id)
+            plans = await get_floor_plans(complex_id)
+            text = format_complex_info(c)
+            kb = get_floor_plans_kb(complex_id) if plans else None
+
+            if photos:
+                if len(photos) == 1:
+                    await message.answer_photo(photos[0].telegram_file_id, caption=text, parse_mode="HTML",
+                                               reply_markup=kb)
+                else:
+                    media_group = [InputMediaPhoto(media=p.telegram_file_id) for p in photos[:10]]
+                    if len(text) <= 1024:
+                        media_group[0].caption = text
+                        media_group[0].parse_mode = "HTML"
+                        await message.answer_media_group(media_group)
+                        if kb:
+                            await message.answer("Дополнительная информация:", reply_markup=kb)
+                    else:
+                        await message.answer_media_group(media_group)
+                        await message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
+            else:
+                await message.answer(text, parse_mode="HTML", reply_markup=kb, disable_web_page_preview=True)
+
+            await message.answer("🏠 Главное меню:", reply_markup=get_main_menu_kb(is_admin))
+            return
+
+        else:
+            await message.answer("Доступ разрешен.", reply_markup=get_main_menu_kb(is_admin))
+            return
+
     if user.status == 'rejected':
         await message.answer("Доступ запрещен.", reply_markup=ReplyKeyboardRemove())
         return
@@ -47,10 +85,8 @@ async def cmd_start(message: Message, state: FSMContext):
         await message.answer("Заявка находится на рассмотрении.", reply_markup=ReplyKeyboardRemove())
         return
 
-    # Если мы здесь, значит статус 'pending' (новый пользователь)
     await state.set_state(Registration.full_name)
     await message.answer("Регистрация. Введите ваше ФИО:", reply_markup=ReplyKeyboardRemove())
-
 
 @router.message(Registration.full_name)
 async def process_full_name(message: Message, state: FSMContext):
