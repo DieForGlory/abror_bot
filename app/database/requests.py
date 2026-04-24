@@ -129,9 +129,10 @@ async def get_all_user_ids():
 
 async def delete_complex(complex_id: int):
     async with async_session() as session:
-        stmt = delete(ResidentialComplex).where(ResidentialComplex.id == complex_id)
-        await session.execute(stmt)
-        await session.commit()
+        complex_obj = await session.get(ResidentialComplex, complex_id)
+        if complex_obj:
+            await session.delete(complex_obj)
+            await session.commit()
 
 
 async def get_floor_plans(complex_id: int):
